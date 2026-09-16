@@ -1,0 +1,951 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Trash2, Search, BarChart3, Gamepad2, BookOpen, Recycle, 
+  AlertTriangle, Leaf, HelpCircle, CheckCircle2, XCircle, 
+  RotateCcw, Trash, Award, Clock, ArrowRight, ShieldAlert,
+  Sparkles, Check, Info, Flame, ChevronRight, Filter
+} from 'lucide-react';
+
+interface WasteItem {
+  id: string;
+  name: string;
+  category: 'organic' | 'recycle' | 'hazardous' | 'general';
+  binColor: 'green' | 'yellow' | 'red' | 'blue';
+  binName: string;
+  binHex: string;
+  instructions: string;
+  decompositionTime: string;
+  icon: string;
+  tags: string[];
+}
+
+interface HistoryItem {
+  id: string;
+  itemName: string;
+  category: 'organic' | 'recycle' | 'hazardous' | 'general';
+  binName: string;
+  timestamp: string;
+  count: number;
+}
+
+const WASTE_DATABASE: WasteItem[] = [
+  // Organic (ขยะอินทรีย์ - ถังเขียว)
+  { id: '1', name: 'เปลือกกล้วย', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'สลัดสิ่งสกปรกออกแล้วนำไปทำปุ๋ยหมักหรือทิ้งลงถังขยะย่อยสลายได้ทันที', decompositionTime: '1 - 2 สัปดาห์', icon: '🍌', tags: ['ผลไม้', 'อาหาร', 'เศษอาหาร'] },
+  { id: '2', name: 'เศษอาหาร / ข้าวเหลือ', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'เทน้ำออกให้หมดก่อนทิ้ง เพื่อป้องกันกลิ่นเหม็นและแมลงวัน', decompositionTime: '1 - 2 สัปดาห์', icon: '🍚', tags: ['อาหาร', 'เศษอาหาร'] },
+  { id: '3', name: 'เปลือกไข่', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'สามารถบดละเอียดแล้วโรยใส่โคนต้นไม้เพื่อเพิ่มแคลเซียมได้', decompositionTime: '1 - 3 เดือน', icon: '🥚', tags: ['อาหาร', 'ครัวเรือน'] },
+  { id: '4', name: 'ใบไม้ / กิ่งไม้แห้ง', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'รวบรวมใส่ถุงหรือกองรวมกันเพื่อทำปุ๋ยหมักชีวภาพ', decompositionTime: '1 - 6 เดือน', icon: '🍂', tags: ['ธรรมชาติ', 'สวน'] },
+  { id: '5', name: 'กากกาแฟ / ใบชา', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'นำไปขัดผิว ผสมดินปลูกต้นไม้ หรือดูดกลิ่นอับได้', decompositionTime: '2 - 4 สัปดาห์', icon: '☕', tags: ['เครื่องดื่ม', 'ครัวเรือน'] },
+  { id: '6', name: 'เศษผักและผลไม้', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'ล้างสะเด็ดน้ำเล็กน้อย ทิ้งลงถังขยะย่อยสลายได้', decompositionTime: '1 - 2 สัปดาห์', icon: '🥬', tags: ['ผัก', 'อาหาร'] },
+  { id: '7', name: 'กระดูกสัตว์ชิ้นเล็ก', category: 'organic', binColor: 'green', binName: 'ถังขยะอินทรีย์ (สีเขียว)', binHex: 'bg-emerald-600', instructions: 'ทิ้งในถังอินทรีย์สำหรับโรงงานหรือฝังกลบตามความเหมาะสม', decompositionTime: '6 เดือน - 1 ปี', icon: '🦴', tags: ['อาหาร', 'เนื้อสัตว์'] },
+
+  // Recycle (ขยะรีไซเคิล - ถังเหลือง)
+  { id: '8', name: 'ขวดพลาสติกใส (PET)', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'เทน้ำออก บีบขวดให้แบนเพื่อประหยัดพื้นที่ และแยกฝาก่อนทิ้ง', decompositionTime: '450 ปีขึ้นไป', icon: ' botella', tags: ['พลาสติก', 'ขวด', 'เครื่องดื่ม'] },
+  { id: '9', name: 'กระป๋องอลูมิเนียม / น้ำอัดลม', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'ล้างคราบน้ำหวานด้านในให้สะอาด แล้วเหยียบให้แบน', decompositionTime: '80 - 200 ปี', icon: '🥫', tags: ['โลหะ', 'กระป๋อง', 'เครื่องดื่ม'] },
+  { id: '10', name: 'กระดาษหนังสือพิมพ์ / กล่องกระดาษ', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'พับเก็บให้เรียบร้อย ห้ามเปื้อนน้ำมันหรือเศษอาหาร', decompositionTime: '2 - 5 สัปดาห์', icon: '📦', tags: ['กระดาษ', 'กล่อง'] },
+  { id: '11', name: 'ขวดแก้ว (ใส / สีชา / เขียว)', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'ล้างทำความสะอาด ระวังไม่ให้แตกหักเพื่อความปลอดภัยของพนักงานเก็บขยะ', decompositionTime: '1 ล้านปีขึ้นไป', icon: '🍾', tags: ['แก้ว', 'ขวด'] },
+  { id: '12', name: 'กล่องนมยูเอชที (กล่อง UHT)', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'ตัดล้างด้านในให้สะอาด พับแบนรวมกัน (โครงการหลังคาเขียว)', decompositionTime: '5 ปีขึ้นไป', icon: '🧃', tags: ['กล่อง', 'กระดาษฟอยล์'] },
+  { id: '13', name: 'ถุงพลาสติกสะอาด / ฟิล์มยืด', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'รวบรวมถุงสะอาดไม่เปื้อนน้ำมัน มัดรวมกันเพื่อนำไปหลอมใหม่', decompositionTime: '20 - 1000 ปี', icon: '🛍️', tags: ['พลาสติก', 'ถุง'] },
+  { id: '14', name: 'กระป๋องสเปรย์โลหะเปล่า', category: 'recycle', binColor: 'yellow', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', binHex: 'bg-amber-500', instructions: 'ตรวจสอบว่าหมดแก๊สด้านในแล้วหรือไม่ เจาะรูระบายอากาศถ้าจำเป็น', decompositionTime: '100 ปีขึ้นไป', icon: '🧴', tags: ['โลหะ', 'กระป๋อง'] },
+
+  // Hazardous (ขยะอันตราย - ถังแดง)
+  { id: '15', name: 'ถ่านไฟฉาย / แบตเตอรี่', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'ห้ามทิ้งรวมกับขยะทั่วไปเพราะมีสารโลหะหนัก รวบรวมส่งจุดรับทิ้งพิเศษ', decompositionTime: '100 ปีขึ้นไป', icon: '🔋', tags: ['แบตเตอรี่', 'ไฟฟ้า', 'สารเคมี'] },
+  { id: '16', name: 'หลอดไฟนีออน / หลอด LED', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'ห่อหุ้มด้วยกระดาษหรือกล่องเดิมให้มิดชิด ป้องกันการแตกกระจายของไอปรอท', decompositionTime: 'ไม่ย่อยสลาย', icon: '💡', tags: ['หลอดไฟ', 'ไฟฟ้า'] },
+  { id: '17', name: 'กระป๋องยาฆ่าแมลง / สเปรย์เคมี', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'ปิดฝาให้สนิท ห้ามทุบทำลายหรือเผาไฟเพราะอาจเกิดการระเบิด', decompositionTime: '80 - 100 ปี', icon: '🧪', tags: ['สารเคมี', 'สเปรย์'] },
+  { id: '18', name: 'แบตเตอรี่มือถือ / Power Bank', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'นำส่งจุดรับขยะอิเล็กทรอนิกส์ (E-Waste) ห้ามทิ้งลงถังทั่วไปเด็ดขาด', decompositionTime: '500 ปีขึ้นไป', icon: '📱', tags: ['อิเล็กทรอนิกส์', 'แบตเตอรี่'] },
+  { id: '19', name: 'น้ำยาทำความสะอาด / น้ำยาฟอกขาว', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'ปิดฝาขวดให้แน่นสนิท แยกเก็บใส่ถุงมัดปากแน่น ป้องกันสารเคมีรั่วไหล', decompositionTime: 'ไม่ย่อยสลาย', icon: '🧴', tags: ['สารเคมี', 'น้ำยา'] },
+  { id: '20', name: 'เทอร์โมมิเตอร์วัดไข้ปรอท', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'ห่อหุ้มด้วยวัสดุกันกระแทก แจ้งเจ้าหน้าที่เก็บขยะอันตรายโดยเฉพาะ', decompositionTime: 'ไม่ย่อยสลาย', icon: '🌡️', tags: ['ปรอท', 'การแพทย์'] },
+  { id: '21', name: 'ยาหมดอายุ / แผงยา', category: 'hazardous', binColor: 'red', binName: 'ถังขยะอันตราย (สีแดง)', binHex: 'bg-rose-600', instructions: 'รวบรวมส่งโรงพยาบาลหรือจุดรับทิ้งยาอันตราย ห้ามทิ้งลงโถส้วม', decompositionTime: 'หลายปี', icon: '💊', tags: ['ยา', 'การแพทย์'] },
+
+  // General (ขยะทั่วไป - ถังน้ำเงิน)
+  { id: '22', name: 'กล่องโฟมใส่อาหาร', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'เทเศษอาหารออกให้หมด เช็ดคราบมัน ห่อกระดาษก่อนทิ้งลงถังทั่วไป', decompositionTime: '500 - 1000 ปี', icon: '🥡', tags: ['โฟม', 'บรรจุภัณฑ์'] },
+  { id: '23', name: 'ถุงพลาสติกเปื้อนแกง / ถุงก๊อปแก๊ปมันๆ', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'ล้างคราบมันยากเกินกว่าจะรีไซเคิลได้ ให้มัดปากถุงให้แน่นแล้วทิ้ง', decompositionTime: '450 ปี', icon: '🛍️', tags: ['พลาสติก', 'ถุง'] },
+  { id: '24', name: 'ซองบะหมี่กึ่งสำเร็จรูป', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'ซองฟอยล์พลาสติกผสมอะลูมิเนียมรีไซเคิลยาก ทิ้งขยะทั่วไป', decompositionTime: '100 ปีขึ้นไป', icon: '🍜', tags: ['พลาสติก', 'ซองอาหาร'] },
+  { id: '25', name: 'ทิชชูเปียก / สำลีใช้แล้ว', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'วัสดุผสมใยสังเคราะห์ย่อยสลายยาก ห่อกระดาษทิชชูแห้งทิ้งขยะทั่วไป', decompositionTime: '100 ปีขึ้นไป', icon: '🧻', tags: ['สุขอนามัย', 'กระดาษ'] },
+  { id: '26', name: 'ผ้าอ้อมสำเร็จรูป / ผ้าอนามัย', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'ม้วนเก็บ ห่อด้วยกระดาษหนังสือพิมพ์หรือถุงพลาสติกชั้นนอกให้มิดชิด', decompositionTime: '450 ปี', icon: '👶', tags: ['สุขอนามัย', 'เด็ก'] },
+  { id: '27', name: 'เศษแก้วแตกชิ้นเล็กๆ', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'ห่อกระดาษหนาหลายชั้นหรือใส่กล่องกระดาษเขียนเตือน "ระวังแก้วแตก"', decompositionTime: '1 ล้านปี', icon: '🏺', tags: ['แก้ว', 'อันตราย'] },
+  { id: '28', name: 'ฟิล์มกันรอย / เทปกาวใส', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'กาวเหนียวและวัสดุผสมไม่สามารถนำไปรีไซเคิลต่อได้ ทิ้งขยะทั่วไป', decompositionTime: '100 ปีขึ้นไป', icon: '📜', tags: ['กาว', 'พลาสติก'] },
+  { id: '29', name: 'หน้ากากอนามัยใช้แล้ว', category: 'general', binColor: 'blue', binName: 'ถังขยะทั่วไป (สีน้ำเงิน)', binHex: 'bg-sky-600', instructions: 'พับสายคล้องรัดตัวหน้ากาก มัดใส่ถุงพลาสติกแยกต่างหากเพื่อสุขอนามัย', decompositionTime: '400 ปี', icon: '😷', tags: ['สุขภาพ', 'หน้ากาก'] }
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'classifier' | 'history' | 'game' | 'guide'>('classifier');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  
+  // History state with LocalStorage
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('eco_waste_history');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      { id: 'h1', itemName: 'ขวดพลาสติกใส (PET)', category: 'recycle', binName: 'ถังขยะรีไซเคิล (สีเหลือง)', timestamp: 'วันนี้ 10:30 น.', count: 2 },
+      { id: 'h2', itemName: 'เปลือกกล้วย', category: 'organic', binName: 'ถังขยะอินทรีย์ (สีเขียว)', timestamp: 'วันนี้ 08:15 น.', count: 1 },
+      { id: 'h3', itemName: 'ถ่านไฟฉาย / แบตเตอรี่', category: 'hazardous', binName: 'ถังขยะอันตราย (สีแดง)', timestamp: 'เมื่อวาน 16:45 น.', count: 4 }
+    ];
+  });
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('eco_waste_history', JSON.stringify(history));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [history]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  const addHistoryItem = (item: WasteItem, count = 1) => {
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      itemName: item.name,
+      category: item.category,
+      binName: item.binName,
+      timestamp: new Date().toLocaleDateString('th-TH', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+      count
+    };
+    setHistory([newItem, ...history]);
+    showToast(`บันทึกการทิ้ง "${item.name}" ลงในประวัติเรียบร้อยแล้ว! 🌱`);
+  };
+
+  const clearHistory = () => {
+    if (window.confirm('คุณต้องการล้างประวัติการคัดแยกทั้งหมดใช่หรือไม่?')) {
+      setHistory([]);
+      showToast('ล้างประวัติสำเร็จ');
+    }
+  };
+
+  const deleteHistoryItem = (id: string) => {
+    setHistory(history.filter(h => h.id !== id));
+    showToast('ลบรายการสำเร็จ');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center space-x-3 animate-bounce">
+          <Sparkles className="w-5 h-5 text-yellow-300 animate-spin" />
+          <span className="font-medium">{toastMessage}</span>
+        </div>
+      )}
+
+      {}
+      <header className="bg-emerald-700 text-white shadow-lg sticky top-0 z-40 backdrop-blur-md bg-opacity-95">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('classifier')}>
+            <div className="bg-emerald-800 p-2.5 rounded-2xl shadow-inner border border-emerald-600 flex items-center justify-center">
+              <Recycle className="w-8 h-8 text-emerald-300 animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                Smart Waste <span className="text-emerald-300 font-light">Sorting</span>
+              </h1>
+              <p className="text-xs text-emerald-100 font-medium tracking-wide">
+                ระบบคัดแยกขยะอัจฉริยะและพิทักษ์สิ่งแวดล้อมเพื่อความยั่งยืน
+              </p>
+            </div>
+          </div>
+
+          <nav className="flex items-center bg-emerald-800/80 p-1.5 rounded-2xl border border-emerald-600 shadow-inner overflow-x-auto max-w-full">
+            <button
+              onClick={() => setActiveTab('classifier')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                activeTab === 'classifier' 
+                  ? 'bg-white text-emerald-800 shadow-md' 
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-700/50'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              <span>ค้นหา & จำแนกขยะ</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                activeTab === 'history' 
+                  ? 'bg-white text-emerald-800 shadow-md' 
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-700/50'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>ประวัติ & สถิติ</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('game')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                activeTab === 'game' 
+                  ? 'bg-white text-emerald-800 shadow-md' 
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-700/50'
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4" />
+              <span>มินิเกมคัดแยก</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('guide')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                activeTab === 'guide' 
+                  ? 'bg-white text-emerald-800 shadow-md' 
+                  : 'text-emerald-100 hover:text-white hover:bg-emerald-700/50'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>คู่มือถัง 4 สี</span>
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'classifier' && (
+          <ClassifierView 
+            wasteData={WASTE_DATABASE} 
+            onLogItem={addHistoryItem} 
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            selectedCategoryFilter={selectedCategoryFilter}
+            setSelectedCategoryFilter={setSelectedCategoryFilter}
+          />
+        )}
+        {activeTab === 'history' && (
+          <HistoryView 
+            history={history} 
+            onClearHistory={clearHistory} 
+            onDeleteItem={deleteHistoryItem} 
+          />
+        )}
+        {activeTab === 'game' && (
+          <GameView wasteData={WASTE_DATABASE} onCompleteGame={(score) => showToast(`ยอดเยี่ยม! คุณทำคะแนนเกมคัดแยกขยะได้ ${score} คะแนน`)} />
+        )}
+        {activeTab === 'guide' && (
+          <GuideView />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-8 text-center text-sm">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Leaf className="w-5 h-5 text-emerald-500" />
+            <span className="font-bold text-slate-200">Smart Waste Sorting System</span>
+          </div>
+          <p>© 2026 สร้างสรรค์เพื่อสิ่งแวดล้อมที่ยั่งยืนด้วย React & Tailwind CSS</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+interface ClassifierProps {
+  wasteData: WasteItem[];
+  onLogItem: (item: WasteItem, count?: number) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  selectedCategoryFilter: string;
+  setSelectedCategoryFilter: (cat: string) => void;
+}
+
+function ClassifierView({ 
+  wasteData, 
+  onLogItem, 
+  searchQuery, 
+  setSearchQuery,
+  selectedCategoryFilter,
+  setSelectedCategoryFilter 
+}: ClassifierProps) {
+  const [selectedItem, setSelectedItem] = useState<WasteItem | null>(wasteData[0]);
+
+  const filteredItems = useMemo(() => {
+    return wasteData.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesCat = selectedCategoryFilter === 'all' || item.category === selectedCategoryFilter;
+      return matchesSearch && matchesCat;
+    });
+  }, [wasteData, searchQuery, selectedCategoryFilter]);
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      {/* Hero Search & Banner */}
+      <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+        <div className="absolute right-0 bottom-0 opacity-10 translate-x-10 translate-y-10 pointer-events-none">
+          <Recycle className="w-96 h-96 text-white" />
+        </div>
+        <div className="max-w-3xl relative z-10 space-y-4">
+          <span className="bg-emerald-500/40 text-emerald-100 text-xs font-semibold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-emerald-400/30 inline-flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> ระบบค้นหาขยะอัจฉริยะทันที
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight">คุณกำลังถือขยะอะไรอยู่? ค้นหาเลย</h2>
+          <p className="text-emerald-100 text-sm sm:text-base">
+            พิมพ์ชื่อขยะ เช่น "ขวดพลาสติก", "ถ่านไฟฉาย", "เปลือกกล้วย" หรือเลือกจากหมวดหมู่ด้านล่าง เพื่อดูถังขยะที่ถูกต้องและวิธีจัดการอย่างถูกต้อง
+          </p>
+
+          <div className="relative mt-4">
+            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+              <Search className="w-5 h-5 text-emerald-600" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาชื่อขยะ หรือประเภท (เช่น กล่องโฟม, ถ่าน, พลาสติก)..."
+              className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white text-slate-800 placeholder-slate-400 font-medium shadow-xl focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all text-base"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ล้างคำค้น
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Category Filter Pills */}
+      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+        <span className="text-sm font-bold text-slate-500 flex items-center gap-1 mr-2">
+          <Filter className="w-4 h-4" /> หมวดหมู่:
+        </span>
+        {[
+          { id: 'all', label: 'ทั้งหมด', color: 'bg-slate-800 text-white' },
+          { id: 'organic', label: '🟢 ขยะอินทรีย์', color: 'bg-emerald-700 text-white' },
+          { id: 'recycle', label: '🟡 ขยะรีไซเคิล', color: 'bg-amber-600 text-white' },
+          { id: 'hazardous', label: '🔴 ขยะอันตราย', color: 'bg-rose-700 text-white' },
+          { id: 'general', label: '🔵 ขยะทั่วไป', color: 'bg-sky-600 text-white' }
+        ].map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategoryFilter(cat.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap shadow-sm ${
+              selectedCategoryFilter === cat.id 
+                ? `${cat.color} ring-2 ring-offset-2 ring-emerald-500 scale-105` 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Grid: Item List & Detail Inspector */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left List of Items */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+              รายการขยะในระบบ <span className="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">{filteredItems.length} รายการ</span>
+            </h3>
+          </div>
+
+          {filteredItems.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                🔍
+              </div>
+              <h4 className="font-bold text-lg text-slate-700">ไม่พบรายการขยะที่คุณค้นหา</h4>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                ลองเปลี่ยนคำค้นหา หรือเลือกหมวดหมู่อื่น หรือคุณสามารถแจ้งเพิ่มรายการใหม่ได้ในอนาคต
+              </p>
+              <button 
+                onClick={() => { setSearchQuery(''); setSelectedCategoryFilter('all'); }}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-md"
+              >
+                รีเซ็ตการค้นหา
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[650px] overflow-y-auto pr-2">
+              {filteredItems.map(item => {
+                const isSelected = selectedItem?.id === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedItem(item)}
+                    className={`bg-white p-5 rounded-2xl border transition-all cursor-pointer flex items-center space-x-4 shadow-sm hover:shadow-md ${
+                      isSelected 
+                        ? 'border-emerald-500 ring-2 ring-emerald-400/30 bg-emerald-50/40 translate-x-1' 
+                        : 'border-slate-200 hover:border-emerald-300'
+                    }`}
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-3xl shadow-inner flex-shrink-0">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className={`w-3 h-3 rounded-full ${item.binHex}`} />
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                          {item.category === 'organic' && 'อินทรีย์'}
+                          {item.category === 'recycle' && 'รีไซเคิล'}
+                          {item.category === 'hazardous' && 'อันตราย'}
+                          {item.category === 'general' && 'ทั่วไป'}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-base truncate mt-0.5">{item.name}</h4>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{item.binName}</p>
+                    </div>
+                    <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isSelected ? 'rotate-90 text-emerald-600' : ''}`} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right Detail Card (Inspector) */}
+        <div className="lg:col-span-5 sticky top-24">
+          {selectedItem ? (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden animate-fadeIn">
+              {/* Header Banner colored by Bin Type */}
+              <div className={`${selectedItem.binHex} p-6 text-white relative overflow-hidden`}>
+                <div className="absolute right-[-20px] bottom-[-20px] opacity-20 text-8xl pointer-events-none">
+                  {selectedItem.icon}
+                </div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                    รายละเอียดการคัดแยก
+                  </span>
+                  <span className="text-3xl">{selectedItem.icon}</span>
+                </div>
+                <div className="mt-4 relative z-10">
+                  <h3 className="text-2xl font-black">{selectedItem.name}</h3>
+                  <p className="text-white/90 text-sm font-medium mt-1 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-200" /> แนะนำทิ้งลง: <strong className="underline">{selectedItem.binName}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Body Details */}
+              <div className="p-6 space-y-6">
+                {/* Simulated Bin Graphic */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center space-x-4">
+                  <div className={`w-14 h-16 ${selectedItem.binHex} rounded-t-lg rounded-b-md shadow-lg flex flex-col items-center justify-center text-white relative flex-shrink-0`}>
+                    <div className="w-8 h-1.5 bg-white/40 rounded-full absolute top-1.5" />
+                    <Trash2 className="w-6 h-6 mt-1" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-800 text-sm">ถังขยะที่ถูกต้อง</h5>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">{selectedItem.binName}</p>
+                    <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">
+                      ✓ แยกถูกต้องช่วยลดปริมาณขยะฝังกลบได้มาก
+                    </span>
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="space-y-2">
+                  <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-emerald-600" /> วิธีการจัดการก่อนทิ้ง
+                  </h5>
+                  <div className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-2xl text-slate-700 text-sm font-medium leading-relaxed">
+                    {selectedItem.instructions}
+                  </div>
+                </div>
+
+                {/* Decomposition Time */}
+                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h6 className="text-xs font-bold text-slate-400 uppercase">ระยะเวลาย่อยสลาย</h6>
+                      <p className="text-sm font-bold text-slate-800">{selectedItem.decompositionTime}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Button: Log to History */}
+                <button
+                  onClick={() => onLogItem(selectedItem)}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2 active:scale-95"
+                >
+                  <Sparkles className="w-5 h-5 text-yellow-300" />
+                  <span>บันทึกการทิ้งขยะชิ้นนี้ลงในประวัติ</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-3xl p-8 text-center border border-slate-200 shadow-sm">
+              <p className="text-slate-500">กรุณาเลือกรายการขยะทางซ้ายเพื่อดูรายละเอียด</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface HistoryProps {
+  history: HistoryItem[];
+  onClearHistory: () => void;
+  onDeleteItem: (id: string) => void;
+}
+
+function HistoryView({ history, onClearHistory, onDeleteItem }: HistoryProps) {
+  const stats = useMemo(() => {
+    const total = history.reduce((acc, curr) => acc + curr.count, 0);
+    const organicCount = history.filter(h => h.category === 'organic').reduce((acc, curr) => acc + curr.count, 0);
+    const recycleCount = history.filter(h => h.category === 'recycle').reduce((acc, curr) => acc + curr.count, 0);
+    const hazardousCount = history.filter(h => h.category === 'hazardous').reduce((acc, curr) => acc + curr.count, 0);
+    const generalCount = history.filter(h => h.category === 'general').reduce((acc, curr) => acc + curr.count, 0);
+    return { total, organicCount, recycleCount, hazardousCount, generalCount };
+  }, [history]);
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      {/* Top Banner */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800">ประวัติและสถิติการคัดแยกขยะ</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            ข้อมูลทั้งหมดถูกบันทึกไว้อย่างปลอดภัยใน LocalStorage ของเบราว์เซอร์คุณ
+          </p>
+        </div>
+        {history.length > 0 && (
+          <button
+            onClick={onClearHistory}
+            className="px-4 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl text-sm font-semibold transition-colors flex items-center space-x-2 border border-rose-200 shadow-sm"
+          >
+            <Trash className="w-4 h-4" />
+            <span>ล้างประวัติทั้งหมด</span>
+          </button>
+        )}
+      </div>
+
+      {/* Stats Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">ขยะทั้งหมด</span>
+            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+              📊
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-black text-slate-800">{stats.total}</h3>
+            <p className="text-xs text-slate-500 mt-1">ชิ้นที่คัดแยกแล้ว</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">ถังขยะอินทรีย์</span>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+              🟢
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-black text-emerald-700">{stats.organicCount}</h3>
+            <p className="text-xs text-slate-500 mt-1">ชิ้น (ย่อยสลายได้)</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-amber-100 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-600">ถังขยะรีไซเคิล</span>
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+              🟡
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-black text-amber-600">{stats.recycleCount}</h3>
+            <p className="text-xs text-slate-500 mt-1">ชิ้น (นำกลับมาใช้ใหม่)</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-rose-100 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-600">ถังขยะอันตราย</span>
+            <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+              🔴
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-black text-rose-600">{stats.hazardousCount}</h3>
+            <p className="text-xs text-slate-500 mt-1">ชิ้น (ต้องกำจัดพิเศษ)</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-600">ถังขยะทั่วไป</span>
+            <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+              🔵
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-3xl font-black text-sky-600">{stats.generalCount}</h3>
+            <p className="text-xs text-slate-500 mt-1">ชิ้น (ฝังกลบ)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Breakdown Bars */}
+      {stats.total > 0 && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 className="font-bold text-slate-800 text-base">สัดส่วนประเภทขยะที่คัดแยก (%)</h4>
+          <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+            <div style={{ width: `${(stats.organicCount / stats.total) * 100}%` }} className="bg-emerald-500 transition-all duration-500" title="อินทรีย์" />
+            <div style={{ width: `${(stats.recycleCount / stats.total) * 100}%` }} className="bg-amber-500 transition-all duration-500" title="รีไซเคิล" />
+            <div style={{ width: `${(stats.hazardousCount / stats.total) * 100}%` }} className="bg-rose-500 transition-all duration-500" title="อันตราย" />
+            <div style={{ width: `${(stats.generalCount / stats.total) * 100}%` }} className="bg-sky-500 transition-all duration-500" title="ทั่วไป" />
+          </div>
+          <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-600 pt-2">
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500" /> อินทรีย์ ({Math.round((stats.organicCount / stats.total) * 100)}%)</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500" /> รีไซเคิล ({Math.round((stats.recycleCount / stats.total) * 100)}%)</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500" /> อันตราย ({Math.round((stats.hazardousCount / stats.total) * 100)}%)</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-sky-500" /> ทั่วไป ({Math.round((stats.generalCount / stats.total) * 100)}%)</span>
+          </div>
+        </div>
+      )}
+
+      {/* History Table */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 text-lg">ประวัติรายการทิ้งล่าสุด</h3>
+          <span className="text-xs bg-slate-100 px-3 py-1 rounded-full font-semibold text-slate-600">
+            ทั้งหมด {history.length} รายการ
+          </span>
+        </div>
+
+        {history.length === 0 ? (
+          <div className="p-16 text-center space-y-3">
+            <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+              📭
+            </div>
+            <h4 className="font-bold text-slate-700">ยังไม่มีประวัติการทิ้งขยะ</h4>
+            <p className="text-sm text-slate-400">
+              ไปที่หน้า "ค้นหา & จำแนกขยะ" แล้วกดปุ่มบันทึกขยะที่คุณจัดการแล้วได้เลย
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-400 uppercase text-xs font-bold tracking-wider border-b border-slate-100">
+                  <th className="py-4 px-6">รายการขยะ</th>
+                  <th className="py-4 px-6">หมวดหมู่</th>
+                  <th className="py-4 px-6">ถังขยะที่ทิ้ง</th>
+                  <th className="py-4 px-6">เวลาบันทึก</th>
+                  <th className="py-4 px-6 text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {history.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-4 px-6 font-bold text-slate-800 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {item.itemName}
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        item.category === 'organic' ? 'bg-emerald-100 text-emerald-800' :
+                        item.category === 'recycle' ? 'bg-amber-100 text-amber-800' :
+                        item.category === 'hazardous' ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800'
+                      }`}>
+                        {item.category === 'organic' && 'อินทรีย์'}
+                        {item.category === 'recycle' && 'รีไซเคิล'}
+                        {item.category === 'hazardous' && 'อันตราย'}
+                        {item.category === 'general' && 'ทั่วไป'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-slate-600 font-medium">{item.binName}</td>
+                    <td className="py-4 px-6 text-slate-400 text-xs">{item.timestamp}</td>
+                    <td className="py-4 px-6 text-right">
+                      <button
+                        onClick={() => onDeleteItem(item.id)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                        title="ลบรายการนี้"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface GameProps {
+  wasteData: WasteItem[];
+  onCompleteGame: (score: number) => void;
+}
+
+function GameView({ wasteData, onCompleteGame }: GameProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [shuffledItems, setShuffledItems] = useState<WasteItem[]>([]);
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [gameOver, setGameOver] = useState(false);
+
+  const startGame = () => {
+    const randomized = [...wasteData].sort(() => 0.5 - Math.random()).slice(0, 10);
+    setShuffledItems(randomized);
+    setCurrentIndex(0);
+    setScore(0);
+    setStreak(0);
+    setGameOver(false);
+    setIsPlaying(true);
+    setFeedback(null);
+  };
+
+  const handleChooseBin = (targetCategory: string) => {
+    if (!isPlaying || gameOver || feedback !== null) return;
+
+    const currentItem = shuffledItems[currentIndex];
+    const isCorrect = currentItem.category === targetCategory;
+
+    if (isCorrect) {
+      setFeedback('correct');
+      const newScore = score + 10 + (streak * 2);
+      setScore(newScore);
+      setStreak(streak + 1);
+    } else {
+      setFeedback('wrong');
+      setStreak(0);
+    }
+
+    setTimeout(() => {
+      setFeedback(null);
+      if (currentIndex + 1 < shuffledItems.length) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        setGameOver(true);
+        setIsPlaying(false);
+        onCompleteGame(score + (isCorrect ? 10 : 0));
+      }
+    }, 1000);
+  };
+
+  const currentItem = shuffledItems[currentIndex];
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-8 animate-fadeIn">
+      {/* Game Header Banner */}
+      <div className="bg-gradient-to-br from-emerald-700 to-teal-800 text-white p-8 rounded-3xl shadow-xl text-center space-y-3 relative overflow-hidden">
+        <div className="absolute right-[-30px] bottom-[-30px] opacity-10 text-9xl">
+          🎮
+        </div>
+        <span className="bg-emerald-500/40 text-emerald-100 text-xs font-semibold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-emerald-400/30">
+          มินิเกมฝึกทักษะรักษ์โลก
+        </span>
+        <h2 className="text-3xl font-black">ท้าทายความเร็ว: แยกขยะให้ถูกถัง!</h2>
+        <p className="text-emerald-100 text-sm max-w-lg mx-auto">
+          ทดสอบความรู้ของคุณโดยการเลือกทิ้งขยะที่ปรากฏลงในถังขยะ 4 สีให้ถูกต้องภายใน 10 ข้อ
+        </p>
+
+        {!isPlaying && !gameOver && (
+          <button
+            onClick={startGame}
+            className="mt-4 px-8 py-4 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95 inline-flex items-center space-x-2"
+          >
+            <Flame className="w-5 h-5 text-rose-600" />
+            <span>เริ่มเล่นเกมเลย!</span>
+          </button>
+        )}
+      </div>
+
+      {/* Game Arena */}
+      {isPlaying && currentItem && (
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-8">
+          {/* Status Bar */}
+          <div className="flex justify-between items-center text-sm font-bold text-slate-600 border-b border-slate-100 pb-4">
+            <span className="flex items-center gap-1.5">
+              ข้อที่ <strong className="text-emerald-600 text-lg">{currentIndex + 1}</strong> / {shuffledItems.length}
+            </span>
+            <div className="flex items-center space-x-6">
+              <span>คะแนน: <strong className="text-emerald-600 text-lg">{score}</strong></span>
+              <span>คอมโบ: <strong className="text-amber-600 text-lg">🔥 {streak}x</strong></span>
+            </div>
+          </div>
+
+          {/* Item Card */}
+          <div className={`p-8 rounded-3xl text-center transition-all duration-300 relative overflow-hidden ${
+            feedback === 'correct' ? 'bg-emerald-100 border-2 border-emerald-500 scale-102' :
+            feedback === 'wrong' ? 'bg-rose-100 border-2 border-rose-500 animate-shake' :
+            'bg-slate-50 border border-slate-200'
+          }`}>
+            <div className="text-6xl mb-3">{currentItem.icon}</div>
+            <h3 className="text-2xl font-black text-slate-800">{currentItem.name}</h3>
+            <p className="text-xs text-slate-500 mt-1">นี่คือขยะประเภทใด? เลือกถังด้านล่างให้ถูกต้อง</p>
+
+            {feedback === 'correct' && (
+              <div className="absolute inset-0 bg-emerald-600/90 text-white flex flex-col items-center justify-center animate-fadeIn">
+                <CheckCircle2 className="w-16 h-16 text-yellow-300 mb-2" />
+                <h4 className="text-2xl font-black">ถูกต้องนะคร้าบ! 🎉</h4>
+              </div>
+            )}
+            {feedback === 'wrong' && (
+              <div className="absolute inset-0 bg-rose-600/90 text-white flex flex-col items-center justify-center animate-fadeIn">
+                <XCircle className="w-16 h-16 text-yellow-300 mb-2" />
+                <h4 className="text-2xl font-black">เกือบถูกแล้ว! ถังที่ถูกต้องคือ: {currentItem.binName}</h4>
+              </div>
+            )}
+          </div>
+
+          {/* 4 Bins Options Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { id: 'organic', name: 'ถังสีเขียว', desc: 'ขยะอินทรีย์', color: 'bg-emerald-600 hover:bg-emerald-700', icon: '🟢' },
+              { id: 'recycle', name: 'ถังสีเหลือง', desc: 'ขยะรีไซเคิล', color: 'bg-amber-500 hover:bg-amber-600', icon: '🟡' },
+              { id: 'hazardous', name: 'ถังสีแดง', desc: 'ขยะอันตราย', color: 'bg-rose-600 hover:bg-rose-700', icon: '🔴' },
+              { id: 'general', name: 'ถังสีน้ำเงิน', desc: 'ขยะทั่วไป', color: 'bg-sky-600 hover:bg-sky-700', icon: '🔵' }
+            ].map(bin => (
+              <button
+                key={bin.id}
+                disabled={feedback !== null}
+                onClick={() => handleChooseBin(bin.id)}
+                className={`${bin.color} text-white p-6 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 flex flex-col items-center space-y-2 cursor-pointer disabled:opacity-50`}
+              >
+                <span className="text-3xl">{bin.icon}</span>
+                <span className="font-black text-base">{bin.name}</span>
+                <span className="text-xs text-white/80 font-medium">{bin.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Game Over Screen */}
+      {gameOver && (
+        <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl text-center space-y-6 animate-fadeIn">
+          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
+            🏆
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-3xl font-black text-slate-800">เกมสิ้นสุดแล้ว! ยอดเยี่ยมมาก</h3>
+            <p className="text-slate-500">คุณทำคะแนนรวมได้ทั้งหมด</p>
+            <div className="text-5xl font-black text-emerald-600">{score} คะแนน</div>
+          </div>
+
+          <button
+            onClick={startGame}
+            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg transition-all hover:scale-105 inline-flex items-center space-x-2"
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span>เล่นใหม่อีกครั้ง</span>
+          </button>
+        </div>
+      )}
+
+      {/* Idle Game Starter Prompt */}
+      {!isPlaying && !gameOver && (
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-4">
+          <h4 className="font-bold text-slate-800 text-lg">💡 เคล็ดลับการเล่นเกม</h4>
+          <p className="text-sm text-slate-500 max-w-md mx-auto">
+            การคัดแยกขยะในชีวิตจริงช่วยลดการใช้พลังงานและลดก๊าซเรือนกระจก มาฝึกฝนให้เกิดความคุ้นเคยกันเถอะ!
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GuideView() {
+  const bins = [
+    {
+      color: 'bg-emerald-600',
+      title: 'ถังขยะสีเขียว (ขยะอินทรีย์ / ย่อยสลายได้)',
+      desc: 'สำหรับขยะที่เน่าเสียและย่อยสลายได้เร็ว เช่น เศษอาหาร ผัก ผลไม้ ใบไม้',
+      dos: ['เศษอาหาร เศษผัก ผลไม้', 'เปลือกผลไม้ ใบไม้ กิ่งไม้', 'กากกาแฟ ใบชา'],
+      donts: ['ขยะพลาสติก ถุงพลาสติก', 'โฟม กล่องนม', 'ขยะมีพิษหรือขยะอันตราย'],
+      destination: 'นำไปทำปุ๋ยหมัก ชีวภาพ หรืออาหารสัตว์'
+    },
+    {
+      color: 'bg-amber-500',
+      title: 'ถังขยะสีเหลือง (ขยะรีไซเคิล)',
+      desc: 'สำหรับขยะที่ยังสามารถนำกลับมาใช้ใหม่ (Recycle) ได้อีกครั้ง',
+      dos: ['ขวดพลาสติกใส (PET), ขวดน้ำอัดลม', 'กระป๋องอลูมิเนียม กระป๋องเหล็ก', 'กระดาษ กล่องกระดาษ ขวดแก้ว'],
+      donts: ['ถุงพลาสติกเปื้อนแกง กล่องโฟม', 'กระดาษชำระเปื้อนคราบมัน', 'ขยะติดเชื้อหรือขยะอันตราย'],
+      destination: 'ส่งโรงงานรีไซเคิลเพื่อแปรรูปเป็นผลิตภัณฑ์ใหม่'
+    },
+    {
+      color: 'bg-rose-600',
+      title: 'ถังขยะสีแดง (ขยะอันตราย)',
+      desc: 'สำหรับขยะที่มีสารพิษปนเปื้อน หรือวัตถุอันตรายต่อสิ่งแวดล้อมและสุขภาพ',
+      dos: ['ถ่านไฟฉาย แบตเตอรี่มือถือ', 'หลอดไฟนีออน หลอด LED', 'กระป๋องสเปรย์ ยาหมดอายุ สารเคมี'],
+      donts: ['ขยะทั่วไป เศษอาหาร', 'ขยะรีไซเคิลสะอาด', 'เสื้อผ้าหรือกระดาษทั่วไป'],
+      destination: 'กำจัดด้วยวิธีพิเศษตามมาตรฐานความปลอดภัย'
+    },
+    {
+      color: 'bg-sky-600',
+      title: 'ถังขยะสีน้ำเงิน (ขยะทั่วไป)',
+      desc: 'สำหรับขยะที่ย่อยสลายยากและไม่คุ้มค่าในการนำกลับมารีไซเคิล',
+      dos: ['กล่องโฟมใส่อาหาร ถุงพลาสติกเปื้อน', 'ซองบะหมี่กึ่งสำเร็จรูป ทิชชูเปียก', 'หน้ากากอนามัยใช้แล้ว'],
+      donts: ['ขยะอินทรีย์ เศษอาหารเปียกชื้น', 'ขยะรีไซเคิลที่ล้างสะอาดแล้ว', 'ถ่านไฟฉายและขยะอันตราย'],
+      destination: 'นำไปฝังกลบอย่างถูกวิธีตามหลักสุขาภิบาล'
+    }
+  ];
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider inline-block">
+          คู่มือมาตรฐาน 4 สี
+        </span>
+        <h2 className="text-3xl font-black text-slate-800">ความรู้เบื้องต้นเกี่ยวกับถังขยะ 4 สี</h2>
+        <p className="text-slate-500 text-sm max-w-2xl">
+          การแยกขยะให้ถูกต้องตามประเภทถัง ช่วยลดภาระในการคัดแยกของเจ้าหน้าที่ และช่วยรักษาสิ่งแวดล้อมได้อย่างยั่งยืน
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {bins.map((bin, idx) => (
+          <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className={`${bin.color} p-6 text-white`}>
+              <h3 className="text-xl font-black">{bin.title}</h3>
+              <p className="text-white/90 text-sm mt-1">{bin.desc}</p>
+            </div>
+            <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">สิ่งที่ควรทิ้งลงถังนี้</h4>
+                  <ul className="space-y-1.5">
+                    {bin.dos.map((d, i) => (
+                      <li key={i} className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-rose-500 uppercase tracking-wider mb-2">สิ่งที่ไม่ควรทิ้ง</h4>
+                  <ul className="space-y-1.5">
+                    {bin.donts.map((d, i) => (
+                      <li key={i} className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                        <XCircle className="w-4 h-4 text-rose-500 flex-shrink-0" /> {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mt-4">
+                <span className="text-xs font-bold text-slate-400 uppercase block">ปลายทางการจัดการ</span>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{bin.destination}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
